@@ -24,11 +24,9 @@
   </header>
 
   <main class="dash-main">
-
     <div class="dash-warn">
       ⚠️ Thay đổi lưu vào <strong>localStorage</strong> của trình duyệt này. Không đồng bộ sang thiết bị khác.
     </div>
-
     <div class="dash-toolbar">
       <button type="button" class="dash-btn dash-btn-primary" id="saveAllBtn">💾 Lưu tất cả</button>
       <button type="button" class="dash-btn" id="exportBtn">📤 Xuất JSON</button>
@@ -36,17 +34,13 @@
       <button type="button" class="dash-btn dash-btn-warning" id="resetBtn">🔄 Reset mặc định</button>
       <input type="file" id="importFile" accept="application/json" hidden />
     </div>
-
     <div class="dash-tabs">
       <button type="button" class="dash-tab is-active" data-month="BP104">THÁNG 1</button>
       <button type="button" class="dash-tab" data-month="BP105">THÁNG 2</button>
       <button type="button" class="dash-tab" data-month="BP106">THÁNG 3</button>
     </div>
-
     <div class="dash-status" id="statusBar"></div>
-
     <div class="dash-editor" id="editorArea"></div>
-
   </main>
 
   <div class="dash-toast" id="toast"></div>
