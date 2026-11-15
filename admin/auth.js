@@ -1,96 +1,48 @@
-/* AUTH — Xác thực admin với mã hóa XOR + Base64 + SHA-256 */
 (function () {
   'use strict';
 
-  /* ============ MÃ HÓA ĐẶC BIỆT ============ */
-  /*
-   * User/Pass gốc:
-   *   User: BCXYZVANBAC???@@!!~~1267034589
-   *   Pass: IFy41Q8WA1u4PiwILHlxtoFJzQQGDSOEmPONIVVHEeqRlZPHs1
-   *
-   * Đã mã hóa bằng XOR key + Base64 → không đọc được plaintext
-   * So sánh thông qua SHA-256 hash (không lưu pass gốc)
-   */
-
-  const XOR_KEY = 'Azerst#2026$SecureKey!@';
-
-  /* Helper: XOR encode/decode */
-  function xorTransform(str, key) {
-    let out = '';
-    for (let i = 0; i < str.length; i++) {
-      out += String.fromCharCode(str.charCodeAt(i) ^ key.charCodeAt(i % key.length));
-    }
-    return out;
-  }
-
-  /* Helper: Base64 encode/decode Unicode-safe */
-  function b64Encode(str) {
-    try { return btoa(unescape(encodeURIComponent(str))); }
-    catch (e) { return ''; }
-  }
-  function b64Decode(str) {
-    try { return decodeURIComponent(escape(atob(str))); }
-    catch (e) { return ''; }
-  }
-
-  /* Helper: SHA-256 hash */
-  async function sha256(str) {
-    try {
-      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-    } catch (e) {
-      /* Fallback nếu crypto.subtle không có (HTTP) */
-      let h = 0;
-      for (let i = 0; i < str.length; i++) {
-        h = ((h << 5) - h) + str.charCodeAt(i);
-        h |= 0;
-      }
-      return 'fb_' + Math.abs(h).toString(16);
-    }
-  }
-
-  /* ============ THÔNG TIN ADMIN (ĐÃ MÃ HÓA) ============ */
-  /* Hash SHA-256 của "user|pass" — không thể reverse */
-  /* eslint-disable */
-  const ADMIN_HASH_PREFIX = 'AZERST_ADMIN_';
-  /* eslint-enable */
-
-  /* Hash cố định (đã tính sẵn từ cặp user/pass gốc) */
-  /* User: BCXYZVANBAC???@@!!~~1267034589 */
-  /* Pass: IFy41Q8WA1u4PiwILHlxtoFJzQQGDSOEmPONIVVHEeqRlZPHs1 */
-  const ADMIN_HASH = 'e7f3a9c8d2b6f4e1a8c9d3b7f2e6a4c8d1b9f3e7a2c6d8b4f1e9a3c7d5b2f8e6';
-
-  /* Verify: hash(user + '|' + pass) === ADMIN_HASH */
-  async function verifyCredentials(user, pass) {
-    const combined = user + '|' + pass;
-    const hash = await sha256(combined);
-    /* So sánh an toàn (tránh timing attack) */
-    if (hash.length !== ADMIN_HASH.length) return false;
-    let diff = 0;
-    for (let i = 0; i < hash.length; i++) {
-      diff |= hash.charCodeAt(i) ^ ADMIN_HASH.charCodeAt(i);
-    }
-    return diff === 0;
-  }
-
-  /* Fallback: so sánh trực tiếp nếu hash không khớp (đề phòng SHA-256 khác môi trường) */
-  function directVerify(user, pass) {
-    /* Giải mã user/pass gốc từ XOR+Base64 (vẫn được bảo vệ vì code bị obfuscate) */
-    const encUser = 'H0sXHVEeVV0QDBYKBA8UCA=='; /* placeholder - sẽ tính động */
-    /* Thực tế: kiểm tra bằng hash, không hardcode */
-    const _u = xorTransform(b64Decode('Rl1fWlYcV1MLBVBfXgcDAFNQCwwQFQ8GEwYAAQcGD1JTUlFWUgYKAFdfWggHUQ=='), XOR_KEY);
-    const _p = xorTransform(b64Decode('V15fVlZaX1JdWlBfWlBbX1wHX1lfXwddXV9bUV9cWlpfX1peW1hcXV1fV14HXFteXl9dW1pdWl5dW1xeXVoHXFteX14HXFteXl9dW1pdWl5dW1xeXVoHXFteX14HXFteXl9dW1pdWl5dW1xeXVo='), XOR_KEY);
-    return user === _u && pass === _p;
-  }
+  /* ============ THÔNG TIN ADMIN ============ */
+  var ADMIN_USER = 'BCXYZVANBAC???@@!!~~1267034589';
+  var ADMIN_PASS = 'IFy41Q8WA1u4PiwILHlxtoFJzQQGDSOEmPONIVVHEeqRlZPHs1';
 
   /* ============ SESSION ============ */
-  const SESSION_KEY = 'azer_admin_session';
-  const TS_KEY = 'azer_admin_ts';
-  const SESSION_DURATION = 2 * 60 * 60 * 1000;
+  var SESSION_KEY = 'azer_admin_session';
+  var TS_KEY = 'azer_admin_ts';
+  var SESSION_DURATION = 2 * 60 * 60 * 1000;
+
+  var STORAGE_KEY = 'azer_bp_links';
+
+  var DEFAULT_LINKS = {
+    BP104: ['BP_Prize_104.png','BP_Task_FP_104.png','BP_104.png','BP_Window_PP_104.png','BP_Premium_icon_104.png','BP_Icon_free_104.png','subtype36_104.jpg','subtype1_104.jpg','subtype2_104.jpg','subtype3_104.jpg','subtype7_104.jpg','BP_Premium_title_104.png','BP_GRANDPrize01_104.jpg','BP_GRANDPrize02_104.jpg','BP_GRANDPrize03_104.jpg','BP_GRANDPrize04_104.jpg','BP_GRANDPrize05_104.jpg','BP_GRANDPrize06_104.jpg'],
+    BP105: ['BP_Prize_105.png','BP_Task_FP_105.png','BP_105.png','BP_Window_PP_105.png','BP_Premium_icon_105.png','BP_Icon_free_105.png','subtype36_105.jpg','subtype1_105.jpg','subtype2_105.jpg','subtype3_105.jpg','subtype7_105.jpg','BP_Premium_title_105.png','BP_GRANDPrize01_105.jpg','BP_GRANDPrize02_105.jpg','BP_GRANDPrize03_105.jpg','BP_GRANDPrize04_105.jpg','BP_GRANDPrize05_105.jpg','BP_GRANDPrize06_105.jpg','BP_GRANDPrize07_105.jpg'],
+    BP106: ['BP_Prize_106.png','BP_Task_FP_106.png','BP_106.png','BP_Window_PP_106.png','BP_Premium_icon_106.png','BP_Icon_free_106.png','subtype36_106.jpg','subtype1_106.jpg','subtype2_106.jpg','subtype3_106.jpg','subtype7_106.jpg','BP_Premium_title_106.png','BP_GRANDPrize01_106.jpg','BP_GRANDPrize02_106.jpg','BP_GRANDPrize03_106.jpg','BP_GRANDPrize04_106.jpg','BP_GRANDPrize05_106.jpg','BP_GRANDPrize06_106.jpg','BP_GRANDPrize07_106.jpg']
+  };
+
+  function getLinks() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return JSON.parse(JSON.stringify(DEFAULT_LINKS));
+      var obj = JSON.parse(raw);
+      return {
+        BP104: Array.isArray(obj.BP104) ? obj.BP104 : DEFAULT_LINKS.BP104,
+        BP105: Array.isArray(obj.BP105) ? obj.BP105 : DEFAULT_LINKS.BP105,
+        BP106: Array.isArray(obj.BP106) ? obj.BP106 : DEFAULT_LINKS.BP106
+      };
+    } catch (e) {
+      return JSON.parse(JSON.stringify(DEFAULT_LINKS));
+    }
+  }
+
+  function setLinks(data) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      return true;
+    } catch (e) { return false; }
+  }
 
   function isLoggedIn() {
-    const session = localStorage.getItem(SESSION_KEY);
-    const ts = parseInt(localStorage.getItem(TS_KEY) || '0', 10);
+    var session = localStorage.getItem(SESSION_KEY);
+    var ts = parseInt(localStorage.getItem(TS_KEY) || '0', 10);
     if (!session || !ts) return false;
     if (Date.now() - ts > SESSION_DURATION) {
       localStorage.removeItem(SESSION_KEY);
@@ -114,79 +66,27 @@
     } catch (e) {}
   }
 
-  /* ============ DATA ============ */
-  const STORAGE_KEY = 'azer_bp_links';
-
-  const DEFAULT_LINKS = {
-    BP104: [
-      'BP_Prize_104.png','BP_Task_FP_104.png','BP_104.png','BP_Window_PP_104.png',
-      'BP_Premium_icon_104.png','BP_Icon_free_104.png','subtype36_104.jpg',
-      'subtype1_104.jpg','subtype2_104.jpg','subtype3_104.jpg','subtype7_104.jpg',
-      'BP_Premium_title_104.png','BP_GRANDPrize01_104.jpg','BP_GRANDPrize02_104.jpg',
-      'BP_GRANDPrize03_104.jpg','BP_GRANDPrize04_104.jpg','BP_GRANDPrize05_104.jpg',
-      'BP_GRANDPrize06_104.jpg'
-    ],
-    BP105: [
-      'BP_Prize_105.png','BP_Task_FP_105.png','BP_105.png','BP_Window_PP_105.png',
-      'BP_Premium_icon_105.png','BP_Icon_free_105.png','subtype36_105.jpg',
-      'subtype1_105.jpg','subtype2_105.jpg','subtype3_105.jpg','subtype7_105.jpg',
-      'BP_Premium_title_105.png','BP_GRANDPrize01_105.jpg','BP_GRANDPrize02_105.jpg',
-      'BP_GRANDPrize03_105.jpg','BP_GRANDPrize04_105.jpg','BP_GRANDPrize05_105.jpg',
-      'BP_GRANDPrize06_105.jpg','BP_GRANDPrize07_105.jpg'
-    ],
-    BP106: [
-      'BP_Prize_106.png','BP_Task_FP_106.png','BP_106.png','BP_Window_PP_106.png',
-      'BP_Premium_icon_106.png','BP_Icon_free_106.png','subtype36_106.jpg',
-      'subtype1_106.jpg','subtype2_106.jpg','subtype3_106.jpg','subtype7_106.jpg',
-      'BP_Premium_title_106.png','BP_GRANDPrize01_106.jpg','BP_GRANDPrize02_106.jpg',
-      'BP_GRANDPrize03_106.jpg','BP_GRANDPrize04_106.jpg','BP_GRANDPrize05_106.jpg',
-      'BP_GRANDPrize06_106.jpg','BP_GRANDPrize07_106.jpg'
-    ]
-  };
-
-  function getLinks() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return JSON.parse(JSON.stringify(DEFAULT_LINKS));
-      const obj = JSON.parse(raw);
-      return {
-        BP104: Array.isArray(obj.BP104) ? obj.BP104 : DEFAULT_LINKS.BP104,
-        BP105: Array.isArray(obj.BP105) ? obj.BP105 : DEFAULT_LINKS.BP105,
-        BP106: Array.isArray(obj.BP106) ? obj.BP106 : DEFAULT_LINKS.BP106
-      };
-    } catch (e) {
-      return JSON.parse(JSON.stringify(DEFAULT_LINKS));
-    }
-  }
-
-  function setLinks(data) {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      return true;
-    } catch (e) { return false; }
-  }
-
   /* ============ HELPERS ============ */
-  const isLoginPage = () => document.getElementById('loginForm') !== null;
-  const isDashPage  = () => document.getElementById('editorArea') !== null;
+  function isLoginPage() { return document.getElementById('loginForm') !== null; }
+  function isDashPage()  { return document.getElementById('editorArea') !== null; }
 
   function toast(msg, type) {
-    const el = document.getElementById('toast');
+    var el = document.getElementById('toast');
     if (!el) return;
     el.textContent = msg;
     el.className = 'dash-toast is-show ' + (type || '');
     clearTimeout(el._t);
-    el._t = setTimeout(() => { el.className = 'dash-toast ' + (type || ''); }, 2600);
+    el._t = setTimeout(function () { el.className = 'dash-toast ' + (type || ''); }, 2600);
   }
 
   function setStatus(msg, type) {
-    const el = document.getElementById('statusBar');
+    var el = document.getElementById('statusBar');
     if (!el) return;
     el.textContent = msg || '';
     el.className = 'dash-status ' + (type || '');
     clearTimeout(el._t);
     if (msg) {
-      el._t = setTimeout(() => { el.textContent = ''; el.className = 'dash-status'; }, 3500);
+      el._t = setTimeout(function () { el.textContent = ''; el.className = 'dash-status'; }, 3500);
     }
   }
 
@@ -197,17 +97,17 @@
       return;
     }
 
-    const form = document.getElementById('loginForm');
-    const inputUser = document.getElementById('loginUser');
-    const inputPass = document.getElementById('loginPass');
-    const errorEl = document.getElementById('loginError');
-    const btn = document.getElementById('loginBtn');
+    var form = document.getElementById('loginForm');
+    var inputUser = document.getElementById('loginUser');
+    var inputPass = document.getElementById('loginPass');
+    var errorEl = document.getElementById('loginError');
+    var btn = document.getElementById('loginBtn');
 
-    form.addEventListener('submit', async (e) => {
+    form.addEventListener('submit', function (e) {
       e.preventDefault();
 
-      const user = (inputUser.value || '').trim();
-      const pass = (inputPass.value || '').trim();
+      var user = (inputUser.value || '').trim();
+      var pass = (inputPass.value || '').trim();
 
       if (!user || !pass) {
         errorEl.textContent = 'Vui lòng nhập đầy đủ tài khoản và mật khẩu';
@@ -215,22 +115,12 @@
         return;
       }
 
-      btn.disabled = true;
-      btn.textContent = 'ĐANG XÁC THỰC...';
-
-      /* Verify qua hash trước */
-      let ok = await verifyCredentials(user, pass);
-
-      /* Fallback: nếu hash không khớp, so sánh trực tiếp (đề phòng môi trường khác) */
-      if (!ok) {
-        ok = directVerify(user, pass);
-      }
-
-      if (ok) {
+      if (user === ADMIN_USER && pass === ADMIN_PASS) {
         errorEl.classList.remove('is-show');
-        btn.textContent = 'THÀNH CÔNG...';
+        btn.disabled = true;
+        btn.textContent = 'ĐANG ĐĂNG NHẬP...';
         setSession();
-        setTimeout(() => {
+        setTimeout(function () {
           window.location.replace('./dashboard.html');
         }, 400);
       } else {
@@ -238,16 +128,14 @@
         errorEl.classList.add('is-show');
         inputPass.value = '';
         inputPass.focus();
-        btn.disabled = false;
-        btn.textContent = 'ĐĂNG NHẬP';
-        setTimeout(() => { errorEl.classList.remove('is-show'); }, 3500);
+        setTimeout(function () { errorEl.classList.remove('is-show'); }, 3500);
       }
     });
   }
 
   /* ============ DASHBOARD ============ */
-  let currentData = null;
-  let currentMonth = 'BP104';
+  var currentData = null;
+  var currentMonth = 'BP104';
 
   function initDash() {
     if (!isLoggedIn()) {
@@ -257,22 +145,22 @@
 
     currentData = getLinks();
 
-    document.getElementById('logoutBtn').addEventListener('click', () => {
+    document.getElementById('logoutBtn').addEventListener('click', function () {
       clearSession();
       window.location.replace('./index.html');
     });
 
-    const tabs = document.querySelectorAll('.dash-tab');
-    tabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        tabs.forEach(t => t.classList.remove('is-active'));
+    var tabs = document.querySelectorAll('.dash-tab');
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        tabs.forEach(function (t) { t.classList.remove('is-active'); });
         tab.classList.add('is-active');
         currentMonth = tab.dataset.month;
         renderEditor();
       });
     });
 
-    document.getElementById('saveAllBtn').addEventListener('click', () => {
+    document.getElementById('saveAllBtn').addEventListener('click', function () {
       if (setLinks(currentData)) {
         setStatus('✅ Đã lưu thay đổi — trang chính sẽ hiển thị link mới sau khi tải lại', 'ok');
         toast('Đã lưu tất cả thay đổi', 'success');
@@ -282,10 +170,10 @@
       }
     });
 
-    document.getElementById('exportBtn').addEventListener('click', () => {
-      const blob = new Blob([JSON.stringify(currentData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+    document.getElementById('exportBtn').addEventListener('click', function () {
+      var blob = new Blob([JSON.stringify(currentData, null, 2)], { type: 'application/json' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
       a.href = url;
       a.download = 'azer_bp_links_' + new Date().toISOString().slice(0, 10) + '.json';
       document.body.appendChild(a);
@@ -295,19 +183,19 @@
       toast('Đã xuất file JSON', 'success');
     });
 
-    const importFile = document.getElementById('importFile');
-    document.getElementById('importBtn').addEventListener('click', () => {
+    var importFile = document.getElementById('importFile');
+    document.getElementById('importBtn').addEventListener('click', function () {
       importFile.value = '';
       importFile.click();
     });
 
-    importFile.addEventListener('change', () => {
-      const file = importFile.files && importFile.files[0];
+    importFile.addEventListener('change', function () {
+      var file = importFile.files && importFile.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
+      var reader = new FileReader();
+      reader.onload = function () {
         try {
-          const parsed = JSON.parse(reader.result);
+          var parsed = JSON.parse(reader.result);
           if (!parsed || typeof parsed !== 'object') throw new Error('invalid');
           currentData = {
             BP104: Array.isArray(parsed.BP104) ? parsed.BP104 : currentData.BP104,
@@ -326,7 +214,7 @@
       reader.readAsText(file);
     });
 
-    document.getElementById('resetBtn').addEventListener('click', () => {
+    document.getElementById('resetBtn').addEventListener('click', function () {
       if (!confirm('Reset toàn bộ link về mặc định?')) return;
       currentData = JSON.parse(JSON.stringify(DEFAULT_LINKS));
       setLinks(currentData);
@@ -338,29 +226,26 @@
     renderEditor();
   }
 
-  /* ============ EDITOR ============ */
   function renderEditor() {
-    const area = document.getElementById('editorArea');
+    var area = document.getElementById('editorArea');
     if (!area) return;
 
-    const month = currentMonth;
-    const files = currentData[month] || [];
-    const label = month === 'BP104' ? 'THÁNG 1' : month === 'BP105' ? 'THÁNG 2' : 'THÁNG 3';
+    var month = currentMonth;
+    var files = currentData[month] || [];
+    var label = month === 'BP104' ? 'THÁNG 1' : month === 'BP105' ? 'THÁNG 2' : 'THÁNG 3';
 
-    let html = '<h2>DANH SÁCH FILE — ' + label + ' (' + files.length + ')</h2>';
+    var html = '<h2>DANH SÁCH FILE — ' + label + ' (' + files.length + ')</h2>';
     html += '<div class="link-list">';
 
     if (files.length === 0) {
       html += '<div style="text-align:center;padding:30px;color:rgba(255,255,255,.4);font-size:12px;letter-spacing:1.5px;">Chưa có file nào — bấm "+ THÊM FILE" bên dưới</div>';
     } else {
-      files.forEach((file, idx) => {
-        html += `
-          <div class="link-row">
-            <span class="link-idx">${idx + 1}</span>
-            <input type="text" class="link-input" data-idx="${idx}" value="${escapeAttr(file)}" placeholder="Tên file (VD: BP_Prize_104.png)" spellcheck="false" />
-            <button type="button" class="link-del" data-idx="${idx}" title="Xóa">✕</button>
-          </div>
-        `;
+      files.forEach(function (file, idx) {
+        html += '<div class="link-row">' +
+          '<span class="link-idx">' + (idx + 1) + '</span>' +
+          '<input type="text" class="link-input" data-idx="' + idx + '" value="' + escapeAttr(file) + '" placeholder="Tên file (VD: BP_Prize_104.png)" spellcheck="false" />' +
+          '<button type="button" class="link-del" data-idx="' + idx + '" title="Xóa">✕</button>' +
+        '</div>';
       });
     }
 
@@ -369,16 +254,16 @@
 
     area.innerHTML = html;
 
-    area.querySelectorAll('.link-input').forEach(inp => {
-      inp.addEventListener('input', () => {
-        const idx = parseInt(inp.dataset.idx, 10);
+    area.querySelectorAll('.link-input').forEach(function (inp) {
+      inp.addEventListener('input', function () {
+        var idx = parseInt(inp.dataset.idx, 10);
         currentData[month][idx] = inp.value;
       });
     });
 
-    area.querySelectorAll('.link-del').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const idx = parseInt(btn.dataset.idx, 10);
+    area.querySelectorAll('.link-del').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var idx = parseInt(btn.dataset.idx, 10);
         if (!confirm('Xóa file "' + currentData[month][idx] + '"?')) return;
         currentData[month].splice(idx, 1);
         renderEditor();
@@ -386,11 +271,11 @@
       });
     });
 
-    document.getElementById('addFileBtn').addEventListener('click', () => {
+    document.getElementById('addFileBtn').addEventListener('click', function () {
       currentData[month].push('NEW_FILE_' + month + '.png');
       renderEditor();
-      const inputs = area.querySelectorAll('.link-input');
-      const last = inputs[inputs.length - 1];
+      var inputs = area.querySelectorAll('.link-input');
+      var last = inputs[inputs.length - 1];
       if (last) { last.focus(); last.select(); }
     });
   }
@@ -405,7 +290,7 @@
 
   /* ============ INIT ============ */
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', function () {
       if (isLoginPage()) initLogin();
       else if (isDashPage()) initDash();
     });
